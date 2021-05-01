@@ -1,4 +1,4 @@
-import { query as q} from 'faunadb';
+import { Casefold, query as q} from 'faunadb';
 
 import NextAuth from 'next-auth'
 import Providers from 'next-auth/providers'
@@ -15,17 +15,33 @@ export default NextAuth({
   ],
   
   callbacks: {
-    // async session(session){
-    //   const userActiveSubscription = await Fauna.query(
-    //     q.Get(
-    //       q.Match(
-    //         q.Index('subscription_by_user_ref'),
-    //         q.Select()
-    //       )
-    //     )
-    //   )
-    //   return session
-    // }
+    async session(session){
+      const userActiveSubscription = await Fauna.query(
+        q.Get(
+         q.Intersection([
+                     q.Match(
+            q.Index('subscription_by_user_ref'),
+            q.Select("ref",
+            q.Get(
+              q.Match(
+                q.Index('user_by_email'),
+                q.Casefold(session.user.email)
+              )
+            )
+            )
+          ), 
+          q.Match(
+            q.Index('subscription_by_status'),
+            'active'
+          )
+          ])
+        )
+      )
+      return {
+        ...session,
+        activeSubscription: userActiveSubscription
+      }
+    },
       async signIn(user, account, profile) {
         const { email } = user;
         try{
